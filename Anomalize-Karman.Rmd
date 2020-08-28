@@ -1,0 +1,76 @@
+```{r, cache=TRUE}
+
+library(tidyverse)
+library(anomalize)
+library(stringr)
+library(lubridate)
+library(aws.s3)
+
+
+# In bucket iiaweb-telemetry-data-frames-r
+s3load("normalized_df.Rda", bucket = "iiaweb-telemetry-data-frames-r")
+
+head(normalized_df)
+names(normalized_df)
+
+for (name in names(normalized_df)){
+  if ("BLAC" %in% name){print(name)}
+}
+```
+
+```{r, cache=TRUE}
+nrow(normalized_df)
+```
+
+```{r, cache=TRUE}
+date_start_string <- "2000-01-01"
+
+my_time <- lubridate::as_date(date_start_string)
+
+jan <- ymd(date_start_string)
+
+timestamp <- jan + seconds(normalized_df$drop_me)
+
+#defensive copy
+df <- cbind(timestamp, normalized_df)
+df <- as_tibble(df)
+df <- select(df, -drop_me)
+
+head(df)
+
+# For an interactive viewer, do:
+# NOTE -- the "V" is upper-case)
+#View(my_time_df)
+```
+
+
+```{r, cache=TRUE}
+library(tibbletime)
+df <- as_tbl_time(df, index = timestamp)
+
+df %>% 
+  time_decompose(BLAC, method = "stl", frequency = "auto", trend = "auto") %>%
+  anomalize(remainder, method = "gesd", alpha = 0.05, max_anoms = 0.2) %>%
+  plot_anomaly_decomposition()
+
+df %>% 
+  time_decompose(BLAC, method = "stl", frequency = "auto", trend = "auto") %>%
+  anomalize(remainder, method = "gesd", alpha = 0.05, max_anoms = 0.2) %>%
+  time_recompose()
+
+anom_df2 <- df %>% 
+  time_decompose(BLAC, method = "stl", frequency = "auto", trend = "auto") %>%
+  anomalize(remainder, method = "gesd", alpha = 0.05, max_anoms = 0.2) %>%
+  time_recompose() %>%
+  filter(anomaly == "Yes")
+
+nrow(anom_df2)
+head(anom_df2)
+```
+
+
+```{r, cache=TRUE}
+anom_df2 %>%
+  plot_anomalies(time_recomposed = TRUE, ncol = 3, alpha_dots = 0.2)
+```
+
