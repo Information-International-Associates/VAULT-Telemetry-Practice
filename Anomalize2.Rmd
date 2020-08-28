@@ -1,0 +1,96 @@
+```{r, cache=TRUE}
+library(tidyverse)
+library(anomalize)
+library(stringr)
+library(lubridate)
+library(aws.s3)
+library(tibbletime)
+
+
+# In bucket iiaweb-telemetry-data-frames-r
+# save_object("653/1/653200103200405.gzip", file="653200103200405.csv.gz", bucket = "iiaweb-s3-io-practice-bucket")
+load(file="data/preprocessed_652200101092009.Rda")
+df <- as_tibble(testing_new_df_varname)
+
+print(nrow(df))
+head(df)
+```
+# Parsing Timestamp from Filename (work in progress)
+```{r}
+file_prefix <- "652200101092009"
+flightn <- substr(file_prefix,1,3)
+startTime <- substr(file_prefix,4,nchar(file_prefix))
+startTime <- timestamp(startTime, "%Y%m%d%H%M")
+print(day(startTime))
+startTime
+parse_date_time("01/09/2001 20:09", "mDY HM")
+```
+
+```{r}
+xfun::cache_rds({
+date_start_string <- "2000-01-01"
+
+my_time <- lubridate::as_date(date_start_string)
+
+jan <- ymd(date_start_string)
+
+timestamp <- jan + seconds(normalized_df$drop_me)
+
+#defensive copy
+df <- cbind(timestamp, normalized_df)
+df <- as_tibble(df)
+df <- select(df, -drop_me)
+
+head(df)
+})
+```
+
+```{r}
+#dff <- cbind(df$timestamp, data)
+#df$timestamp <- as.POSIXct(df$timestamp)
+df <- as_tbl_time(df, index = timestamp)
+head(df)
+
+#filter(df, BLAC == 0, ALTR==0, EGT_4==28)
+```
+
+# Set the Column Name for the Variable of Interest We Wish to Investigate
+```{r}
+col <- "CTAC"
+```
+
+```{r}
+xfun::cache_rds({
+
+df %>% 
+  time_decompose(col) %>%
+  anomalize(remainder) %>%
+  plot_anomaly_decomposition()
+})
+```
+
+```{r}
+xfun::cache_rds({
+df %>% 
+  time_decompose(col, method = "stl", frequency = "auto", trend = "auto") %>%
+  anomalize(remainder, method = "gesd", alpha = 0.05, max_anoms = 0.2) %>%
+  time_recompose()
+
+anom_df <- df %>% 
+  time_decompose(col, method = "stl", frequency = "auto", trend = "auto") %>%
+  anomalize(remainder, method = "gesd", alpha = 0.05, max_anoms = 0.2) %>%
+  time_recompose() %>%
+  filter(anomaly == "Yes")
+
+print(nrow(anom_df))
+head(anom_df)
+})
+```
+
+
+```{r}
+xfun::cache_rds({
+anom_df %>%
+  plot_anomalies(time_recomposed = TRUE, ncol = 3, alpha_dots = 0.2)
+})
+```
