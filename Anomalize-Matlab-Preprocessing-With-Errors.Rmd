@@ -258,11 +258,6 @@ for(i in 1:length(data)) {
   
   # the normalized current column
   current_normalized_column <- rep(current_column, each = current_multiplier)
-  
-  remainder <- nrow(normalized_df) - length(current_normalized_column)
-  end_idx <- length(current_normalized_column)
-  start_idx <- end_idx - remainder + 1
-  current_normalized_column <- append(current_normalized_column, current_normalized_column[start_idx:end_idx])
 
   # bind the column  
   normalized_df <- cbind(normalized_df, current_normalized_column  )
@@ -272,27 +267,13 @@ for(i in 1:length(data)) {
 }
 
 # check the names and structure  
-head(normalized_df)
+str(normalized_df)
 ```
 
 # Create a Filename Programatically and Save Output
 ```{r}
 file_prefix <- gsub(".mat", "", filename)
-file_name <- paste("preprocessed_",file_prefix,".Rda", sep="")
-file_name
-```
-
-# Save to Local File
-```{r}
-save(normalized_df, file=file_name)
-```
-
-#Upload to S3
-```{r}
-key = paste("rdata/",file_name)
-print(key)
-# save an in-memory R object into S3
-s3save(normalized_df, bucket = "iiaweb-s3-io-practice-bucket", object = key)
+paste(file_prefix,".Rda", sep="")
 ```
 
 # Addendum
