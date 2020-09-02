@@ -6,6 +6,10 @@ output: html_notebook
 #Load From S3
 ```{r}
 
+#You are apt to get a 403 error (access denied) if you don't load in s3 creds.
+#To do this run the command:
+#Sys.setenv("AWS_ACCESS_KEY_ID" = "", "AWS_SECRET_ACCESS_KEY" = "")
+#in the console. I recommend the console, as it is never advisable to save passwords within scripts.
 library(aws.s3)
 #key <- "Flight 653/1/653200103200405.mat"
 #file_name <- "653200103200405.mat"
