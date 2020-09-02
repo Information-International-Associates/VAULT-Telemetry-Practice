@@ -90,7 +90,9 @@ head(normalized_df)
 ```{r}
 library(lubridate)
 
+#Check max sampling rate
 max_sample_rate <- max(unlist(lapply(params, function(x) unlist(data[[x]][2]))))
+#Calculate milliseconds rate from hertz
 milliseconds_rate <- 1000/max_sample_rate
 
 #Parse the Filename structure for relevant details
@@ -109,11 +111,13 @@ start_time <- mdy_hm(date_string)
 
 timestamp <- start_time + milliseconds(sapply(normalized_df$drop_me, function(x) x*milliseconds_rate))
 
-#defensive copy
+#Add timestamp feature
 normalized_df <- cbind(timestamp, normalized_df)
 normalized_df <- as_tibble(normalized_df)
+#Remove drop_me index
 normalized_df <- select(normalized_df, -drop_me)
 
+#Allow milliseconds to be viewd
 options(digits.secs = 3)
 head(normalized_df)
 ```
