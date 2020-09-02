@@ -6,10 +6,6 @@ output: html_notebook
 #Load From S3
 ```{r}
 
-#You are apt to get a 403 error (access denied) if you don't load in s3 creds.
-#To do this run the command:
-#Sys.setenv("AWS_ACCESS_KEY_ID" = "", "AWS_SECRET_ACCESS_KEY" = "")
-#in the console. I recommend the console, as it is never advisable to save passwords within scripts.
 library(aws.s3)
 #key <- "Flight 653/1/653200103200405.mat"
 #file_name <- "653200103200405.mat"
@@ -78,6 +74,9 @@ upsample_matfile <- function(data){
     # fix the name of the new column (it wnats to name it after the variable)
     names(normalized_df)[names(normalized_df) == "current_normalized_column"] <- current_index
   }
+  
+  
+  
   return(normalized_df)
 }
 
@@ -87,6 +86,39 @@ normalized_df <- upsample_matfile(data)
 print(nrow(normalized_df))
 head(normalized_df)
 ```
+## Adding Timestamp
+```{r}
+library(lubridate)
+
+max_sample_rate <- max(unlist(lapply(params, function(x) unlist(data[[x]][2]))))
+milliseconds_rate <- 1000/max_sample_rate
+
+#Parse the Filename structure for relevant details
+tail_number <- substr(file_name, 1,3)
+year <- substr(file_name, 4,7)
+month <- substr(file_name, 8,9)
+day <- substr(file_name, 10,11)
+hour <- substr(file_name, 12,13)
+minute <- substr(file_name, 14,15)
+print(file_name)
+date_string <- paste(month, "/",day,"/",year, " ", hour,":",minute, sep="")
+
+#Create Timestamp
+start_time <- mdy_hm(date_string)
+
+
+timestamp <- start_time + milliseconds(sapply(normalized_df$drop_me, function(x) x*milliseconds_rate))
+
+#defensive copy
+normalized_df <- cbind(timestamp, normalized_df)
+normalized_df <- as_tibble(normalized_df)
+normalized_df <- select(normalized_df, -drop_me)
+
+options(digits.secs = 3)
+head(normalized_df)
+```
+
+
 ## Addendum: Adding a Map!
 ```{r}
 library(ggmap)
