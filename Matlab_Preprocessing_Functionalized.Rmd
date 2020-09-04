@@ -1,0 +1,140 @@
+---
+title: "Matlab Preprocessing Functionalized"
+output: html_notebook
+---
+
+#Load From S3
+```{r}
+
+library(aws.s3)
+#key <- "Flight 653/1/653200103200405.mat"
+#file_name <- "653200103200405.mat"
+key <- "Flight 657/5/657200208220537.mat"
+file_name <- "657200208220537.mat"
+bucket <- "iia-vault-telemetry-practice-unzipped"
+save_object(key, file=file_name, bucket = bucket)
+```
+
+#Load Raw MatFile
+```{r}
+
+# this is the "middle file" on the wiki page https://wiki.iiaweb.com/index.php?title=VAULT/RawData/DASHLink#Format
+library(tidyverse)
+library(R.matlab)
+library(jsonlite) # to save df as json
+
+# when we get around to data exploration
+library(ggcorrplot)
+library(trelliscopejs)
+
+data <- readMat(file_name)
+```
+
+#Define Upsampling Transformation for Raw Matlab Files
+```{r}
+upsample_matfile <- function(data){
+  #Determine the maximum number of measurements
+  params <- names(data)
+  raw_columns <- lapply(params, function(x) data[[x]][1])
+  col_lengths <- lapply(raw_columns, function(x) length(unlist(x[1])))
+  max_rows <- max(unlist(col_lengths))
+
+  # vector of integers from 1 to max_rows to construct a tibble from
+  drop_me_later <- 1:max_rows
+  
+  # create a tibble
+  # we will cbind all 186 normalized vectors to it as columns
+  normalized_df <- tibble(drop_me = drop_me_later)
+  
+  # 186 loops
+  for(i in 1:length(data)) {
+    # the current column name
+    current_index <- params[i]
+    
+    # the current tibble column
+    current_column <- unlist(data[[current_index]][1][1])
+    
+    # the current column length
+    current_length <- length(current_column)
+    
+    # the current multiplier
+    current_multiplier <- max_rows / current_length
+    
+    # the normalized current column
+    current_normalized_column <- rep(current_column, each = current_multiplier)
+    
+    #remainder <- nrow(normalized_df) - length(current_normalized_column)
+    #end_idx <- length(current_normalized_column)
+    #start_idx <- end_idx - remainder + 1
+    #current_normalized_column <- append(current_normalized_column, current_normalized_column[start_idx:end_idx])
+  
+    # bind the column  
+    normalized_df <- cbind(normalized_df, current_normalized_column  )
+  
+    # fix the name of the new column (it wnats to name it after the variable)
+    names(normalized_df)[names(normalized_df) == "current_normalized_column"] <- current_index
+  }
+  
+  
+  
+  return(normalized_df)
+}
+
+#Upsample the Raw Matfile
+normalized_df <- upsample_matfile(data)
+# check the names and structure  
+print(nrow(normalized_df))
+head(normalized_df)
+```
+## Adding Timestamp
+```{r}
+library(lubridate)
+
+#Check max sampling rate
+max_sample_rate <- max(unlist(lapply(params, function(x) unlist(data[[x]][2]))))
+#Calculate milliseconds rate from hertz
+milliseconds_rate <- 1000/max_sample_rate
+
+#Parse the Filename structure for relevant details
+tail_number <- substr(file_name, 1,3)
+year <- substr(file_name, 4,7)
+month <- substr(file_name, 8,9)
+day <- substr(file_name, 10,11)
+hour <- substr(file_name, 12,13)
+minute <- substr(file_name, 14,15)
+print(file_name)
+date_string <- paste(month, "/",day,"/",year, " ", hour,":",minute, sep="")
+
+#Create Timestamp
+start_time <- mdy_hm(date_string)
+
+
+timestamp <- start_time + milliseconds(sapply(normalized_df$drop_me, function(x) x*milliseconds_rate))
+
+#Add timestamp feature
+normalized_df <- cbind(timestamp, normalized_df)
+normalized_df <- as_tibble(normalized_df)
+#Remove drop_me index
+normalized_df <- select(normalized_df, -drop_me)
+
+#Allow milliseconds to be viewd
+options(digits.secs = 3)
+head(normalized_df)
+```
+
+
+## Addendum: Adding a Map!
+```{r}
+library(ggmap)
+library(maps)
+library(mapdata)
+
+#Load a map of the US
+usa <- map_data("usa")
+
+#Plot US Map and Flight Path
+ggplot() +
+  geom_point(data = normalized_df, aes(x = LONP, y = LATP, group = 1), fill = NA, color = "red") +
+  geom_polygon(data = usa, aes(x=long, y = lat, group = group), fill = NA, color = "blue")
+```
+
