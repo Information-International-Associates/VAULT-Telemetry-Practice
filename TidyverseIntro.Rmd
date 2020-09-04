@@ -1,0 +1,80 @@
+---
+title: "Tidy Introduction"
+output: html_notebook
+---
+
+#Some Great Resources for getting started:
+
+* [R for Data Science](https://r4ds.had.co.nz/)
+* [R Cheatsheets](https://rstudio.com/resources/cheatsheets/)
+
+#Loading Our Dataset
+```{r, cache=TRUE}
+
+library(tidyverse)
+library(anomalize)
+library(stringr)
+library(lubridate)
+library(aws.s3)
+
+
+# In bucket iiaweb-telemetry-data-frames-r
+s3load("normalized_df.Rda", bucket = "iiaweb-telemetry-data-frames-r")
+
+head(normalized_df)
+```
+
+#
+#Column Names
+```{r}
+names(normalized_df)
+```
+
+#Select
+```{r}
+select(normalized_df, starts_with("EG"))
+select(normalized_df, names(normalized_df)[1:5])
+```
+
+#Graphing
+```{r}
+#Body longitudinal acceleration vs Flight path acceleration
+ggplot(data = normalized_df) + 
+  geom_point(mapping = aes(x = BLAC, y = FPAC))
+```
+
+```{r}
+ggplot(data =normalized_df) +
+  geom_bar(mapping = aes(x = LGUP))
+```
+
+```{r}
+ggplot(data = normalized_df, mapping = aes(x = EHRS.3 , y = EGT.3)) +
+  geom_point()
+```
+
+#Filter
+
+```{r}
+unique(normalized_df$EHRS.3)
+filter(normalized_df, EHRS.3 == 7137 | EHRS.3==7138)
+```
+
+
+
+#Mutate: Creating new columns
+```{r}
+normalized_df <- mutate(normalized_df,
+                        blac_sqrt = sqrt(BLAC),
+                        blac_sqrt_double = 2*blac_sqrt)
+select(normalized_df, names(normalized_df)[length(names(normalized_df))-2:length(names(normalized_df))])
+```
+
+
+#Summarize
+```{r}
+normalized_df %>%
+  group_by(LGUP) %>%
+  summarize(qs = quantile(BLAC, c(0.25, 0.75)))
+```
+
